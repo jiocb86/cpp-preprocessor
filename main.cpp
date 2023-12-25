@@ -14,6 +14,10 @@ path operator""_p(const char* data, std::size_t sz) {
     return path(data, data + sz);
 }
 
+void PrintMessage(const string& dest, const string& src, int str_num) {
+    cout << "unknown include file "s << dest << " at file "s << src << " at line "s << str_num << endl;
+}
+
 // напишите эту функцию
 bool Preprocess(const path& in_file, const path& out_file, const vector<path>& include_directories);
 
@@ -93,4 +97,73 @@ void Test() {
 
 int main() {
     Test();
+}
+
+bool Preprocess(istream& input, ostream& output, const path& file_name, const vector<path>& include_directories) {
+    static regex reg1 (R"/(\s*#\s*include\s*"([^"]*)"\s*)/");
+    static regex reg2 (R"/(\s*#\s*include\s*<([^>]*)>\s*)/");
+    smatch m;
+    int str_count = 1;
+    for (string str; getline(input, str); ++str_count) {
+        bool find = false;
+        path next;
+        if (regex_match(str, m, reg1)) {
+            next = file_name.parent_path() / string(m[1]);
+            if (filesystem::exists(next)) {
+                ifstream in(next.string(), ios::in);
+                if (in.is_open()) {
+                    if (!Preprocess(in, output, next.string(), include_directories)) {
+                        return false;
+                    }
+                    continue;
+                }
+                else {
+                    PrintMessage(next.filename().string(), file_name.string(), str_count);
+                    return false;
+                }
+            }
+            else {
+                find = true;
+            }
+        }
+        if (find || regex_match(str, m, reg2)) {
+            bool find = false;
+            for (const auto& dir : include_directories) {
+                next = dir / string(m[1]);
+                if (filesystem::exists(next)) {
+                    ifstream in(next.string(), ios::in);
+                    if (in.is_open()) {
+                        if (!Preprocess(in, output, next.string(), include_directories)) {
+                            return false;
+                        }
+                        find = true;
+                        break;
+                    }
+                    else {
+                        PrintMessage(next.filename().string(), file_name.string(), str_count);
+                        return false;
+                    }
+                }
+            }
+            if (!find) {
+                PrintMessage(next.filename().string(), file_name.string(), str_count);
+                return false;
+            }
+            continue;
+        }
+        output << str << endl;
+    }
+    return true;
+}
+ 
+bool Preprocess(const path& in_file, const path& out_file, const vector<path>& include_directories) {
+    if (!filesystem::exists(in_file)) {
+        return false;
+    }
+    ifstream in(in_file.string(), ios::in);
+    if (!in) {
+        return false;
+    }
+    ofstream out(out_file, ios::out);
+    return Preprocess(in, out, in_file, include_directories);
 }
