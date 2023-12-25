@@ -20,6 +20,7 @@ void PrintMessage(const string& dest, const string& src, int str_num) {
 
 // напишите эту функцию
 bool Preprocess(const path& in_file, const path& out_file, const vector<path>& include_directories);
+bool PreprocessRecursion(istream& input, ostream& output, const path& file_name, const vector<path>& include_directories);
 
 string GetFileContents(string file) {
     ifstream stream(file);
@@ -99,7 +100,7 @@ int main() {
     Test();
 }
 
-bool Preprocess(istream& input, ostream& output, const path& file_name, const vector<path>& include_directories) {
+bool PreprocessRecursion(istream& input, ostream& output, const path& file_name, const vector<path>& include_directories) {
     static regex reg1 (R"/(\s*#\s*include\s*"([^"]*)"\s*)/");
     static regex reg2 (R"/(\s*#\s*include\s*<([^>]*)>\s*)/");
     smatch m;
@@ -112,7 +113,7 @@ bool Preprocess(istream& input, ostream& output, const path& file_name, const ve
             if (filesystem::exists(next)) {
                 ifstream in(next.string(), ios::in);
                 if (in.is_open()) {
-                    if (!Preprocess(in, output, next.string(), include_directories)) {
+                    if (!PreprocessRecursion(in, output, next.string(), include_directories)) {
                         return false;
                     }
                     continue;
@@ -133,7 +134,7 @@ bool Preprocess(istream& input, ostream& output, const path& file_name, const ve
                 if (filesystem::exists(next)) {
                     ifstream in(next.string(), ios::in);
                     if (in.is_open()) {
-                        if (!Preprocess(in, output, next.string(), include_directories)) {
+                        if (!PreprocessRecursion(in, output, next.string(), include_directories)) {
                             return false;
                         }
                         find = true;
@@ -165,5 +166,8 @@ bool Preprocess(const path& in_file, const path& out_file, const vector<path>& i
         return false;
     }
     ofstream out(out_file, ios::out);
-    return Preprocess(in, out, in_file, include_directories);
+    if (!out) {
+        return false;
+    }
+    return PreprocessRecursion(in, out, in_file, include_directories);
 }
